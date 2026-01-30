@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vocaloid 50 Odyssey - SESSION PLAYER</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/tone"></script>
+    <script src="all_songs.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@400;700;900&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00ffcc;
+            --secondary: #ff0055;
+            --bg: #050510;
+            --surface: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* UTILS */
+        .full-screen {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* SCREENS */
+        .screen {
+            position: fixed;
+            inset: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            z-index: 10;
+            background: var(--bg);
+        }
+
+        .screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* 1. LOADING SCREEN */
+        .loading-screen {
+            z-index: 100;
+            color: var(--primary);
+            font-family: 'Orbitron';
+            gap: 20px;
+        }
+
+        /* 2. TITLE SCREEN */
+        .title-screen {
+            background: radial-gradient(circle at center, #1b1b2f 0%, #050510 100%);
+            z-index: 90;
+            gap: 40px;
+        }
+
+        .main-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            font-weight: 900;
+            text-align: center;
+            background: linear-gradient(135deg, #fff, var(--primary));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+            letter-spacing: 4px;
+            line-height: 1.2;
+        }
+
+        .start-btn {
+            background: transparent;
+            color: #fff;
+            border: 2px solid var(--primary);
+            padding: 15px 60px;
+            font-size: 1.5rem;
+            font-family: 'Orbitron';
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .start-btn:hover {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 40px var(--primary);
+            transform: scale(1.05);
+        }
+
+        .data-control {
+            position: absolute;
+            bottom: 60px;
+            display: flex;
+            gap: 10px;
+            opacity: 0.6;
+            transition: 0.3s;
+        }
+
+        .data-control:hover {
+            opacity: 1;
+        }
+
+        .app-details {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+            font-family: 'Orbitron';
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.8rem;
+            line-height: 1.4;
+            pointer-events: none;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+        }
+
+        .copyright-footer {
+            position: absolute;
+            bottom: 20px;
+            font-size: 0.8rem;
+            font-family: 'Orbitron';
+            color: rgba(255, 255, 255, 0.4);
+            text-decoration: none;
+            transition: 0.3s;
+            z-index: 95;
+            letter-spacing: 2px;
+        }
+
+        .copyright-footer:hover {
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        /* 3. GAME SCREEN */
+        .game-screen {
+            background: radial-gradient(circle at center, #151525 0%, #050510 100%);
+        }
+
+        /* HEADER */
+        .top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 70px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 50;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+            pointer-events: none;
+        }
+
+        .top-left,
+        .top-right {
+            pointer-events: auto;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ccc;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: 'Orbitron';
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(4px);
+            transition: 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: var(--primary);
+            color: #000;
+            border-color: var(--primary);
+        }
+
+        .score-box {
+            text-align: right;
+        }
+
+        .combo-box {
+            color: var(--secondary);
+            font-family: 'Orbitron';
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        /* SETTINGS */
+        .settings-panel {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            width: 280px;
+            background: rgba(15, 15, 20, 0.95);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            z-index: 60;
+            backdrop-filter: blur(10px);
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+        }
+
+        .settings-panel.show {
+            display: flex;
+        }
+
+        .st-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .st-label {
+            font-size: 0.75rem;
+            color: #888;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .st-row {
+            display: flex;
+            background: #222;
+            border-radius: 4px;
+            padding: 2px;
+        }
+
+        .st-opt {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: #666;
+            transition: 0.2s;
+            border-radius: 3px;
+        }
+
+        .st-opt.active {
+            background: #444;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 320px;
+            background: rgba(10, 10, 15, 0.98);
+            border-right: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+            z-index: 80;
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .sidebar.show {
+            transform: translateX(0);
+            box-shadow: 20px 0 50px rgba(0, 0, 0, 0.8);
+        }
+
+        .sb-header {
+            padding: 20px;
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sb-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .sb-item {
+            padding: 15px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #888;
+            transition: 0.2s;
+            position: relative;
+        }
+
+        .sb-item:hover {
+            background: #1a1a25;
+            color: #fff;
+        }
+
+        .sb-item.active {
+            background: rgba(0, 255, 204, 0.1);
+            color: var(--primary);
+            border: 1px solid rgba(0, 255, 204, 0.2);
+        }
+
+        .sb-score {
+            position: absolute;
+            right: 10px;
+            top: 15px;
+            font-size: 0.7rem;
+            font-family: 'Orbitron';
+            color: var(--primary);
+        }
+
+        /* MAIN STAGE - ABSOLUTE CENTER */
+        .stage-wrapper {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .stage-content {
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .chord {
+            font-size: 6rem;
+            font-weight: 900;
+            font-family: 'Orbitron';
+            color: var(--primary);
+            text-shadow: 0 0 50px rgba(0, 255, 204, 0.4);
+            margin: 0;
+            line-height: 1;
+            margin-bottom: 10px;
+        }
+
+        .lyric-box {
+            min-height: 6rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+
+        .lyric {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.3;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+            word-break: keep-all;
+            /* 歌詞がないときは少し薄く表示 */
+            opacity: 0.5;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .section-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            color: #aaa;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .tap-btn {
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #1e1e24, #14141a);
+            box-shadow: 8px 8px 30px #0b0b0f, -8px -8px 30px #222;
+            border: 4px solid #333;
+            color: #555;
+            font-family: 'Orbitron';
+            font-size: 1.8rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.05s;
+            outline: none;
+            user-select: none;
+        }
+
+        .tap-btn span {
+            font-size: 0.9rem;
+            margin-top: 5px;
+            opacity: 0.5;
+            font-family: 'Inter';
+        }
+
+        .tap-btn:active,
+        .tap-btn.pressed {
+            transform: scale(0.96);
+            border-color: var(--primary);
+            color: #fff;
+            box-shadow: 0 0 50px rgba(0, 255, 204, 0.3);
+            background: #14141a;
+        }
+
+        .style-switcher {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 20px;
+        }
+
+        .style-btn {
+            background: transparent;
+            border: 1px solid #444;
+            color: #888;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-family: 'Orbitron';
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .style-btn.active {
+            background: var(--primary);
+            color: #000;
+            border-color: var(--primary);
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+        }
+
+        /* JUDGMENT */
+        .judge-text {
+            position: absolute;
+            top: 15%;
+            width: 100%;
+            text-align: center;
+            font-family: 'Orbitron';
+            font-size: 3rem;
+            font-weight: 900;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: 0.1s;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .judge-text.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .judge-text.PERFECT {
+            color: #ffe600;
+            text-shadow: 0 0 20px #ffe600;
+        }
+
+        /* RESULT OVERLAY */
+        .result-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .res-title {
+            font-size: 3rem;
+            font-family: 'Orbitron';
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 5px;
+            animation: slideDown 0.5s;
+        }
+
+        .res-btn {
+            background: #fff;
+            color: #000;
+            font-family: 'Orbitron';
+            padding: 15px 50px;
+            text-transform: uppercase;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.3s;
+            border: none;
+        }
+
+        .res-btn:hover {
+            background: var(--primary);
+            box-shadow: 0 0 30px var(--primary);
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* MOBILE TWEAKS */
+        @media (max-width: 600px) {
+            .chord {
+                font-size: 4.5rem;
+            }
+
+            .lyric {
+                font-size: 1.5rem;
+            }
+
+            .tap-btn {
+                width: 220px;
+                height: 220px;
+            }
+
+            .main-title {
+                font-size: 2rem;
+            }
+        }
+
+        /* MANUAL MODAL STYLES */
+        .manual-btn {
+            background: rgba(255, 255, 255, 0.05);
+            color: #ccc;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 40px;
+            font-size: 1rem;
+            font-family: 'Orbitron';
+            cursor: pointer;
+            transition: 0.3s;
+            border-radius: 4px;
+            letter-spacing: 2px;
+        }
+
+        .manual-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-color: #fff;
+        }
+
+        .manual-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.3s;
+            padding: 20px;
+        }
+
+        .manual-modal.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .manual-content {
+            background: #111;
+            border: 1px solid #333;
+            width: 100%;
+            max-width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            border-radius: 8px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .manual-header {
+            padding: 20px;
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1a1a20;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .manual-header h2 {
+            margin: 0;
+            font-family: 'Orbitron';
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: 0.2s;
+        }
+
+        .close-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .manual-body {
+            padding: 30px;
+            overflow-y: auto;
+            color: #ddd;
+            line-height: 1.8;
+            font-size: 0.95rem;
+        }
+
+        .manual-body section {
+            margin-bottom: 30px;
+        }
+
+        .manual-body h3 {
+            font-family: 'Orbitron';
+            /* Consistently use Orbitron for headers */
+            color: #fff;
+            border-left: 3px solid var(--primary);
+            padding-left: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+        }
+
+        .manual-body ul,
+        .manual-body ol {
+            padding-left: 20px;
+        }
+
+        .manual-body li {
+            margin-bottom: 8px;
+        }
+
+        .note {
+            font-size: 0.85rem;
+            color: #888;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .hl {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+            .manual-body {
+                padding: 20px;
+            }
+
+            .manual-header h2 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="screen loading-screen full-screen" :class="{active: curScreen === 'LOADING'}">
+            <h3>INITIALIZING SYSTEM...</h3>
+        </div>
+        <div class="screen title-screen full-screen" :class="{active: curScreen === 'TITLE'}">
+            <div class="app-details">v2.1 SafeMode </div>
+            <div class="main-title">VOCALOID<br>50 SESSION</div>
+            <div style="display: flex; flex-direction: column; gap: 15px; align-items: center; width: 100%;"><button
+                    class="start-btn" @click="enterGame">START</button><button class="manual-btn"
+                    @click="showManual = true">MANUAL</button></div>
+            <div class="data-control"><button class="icon-btn" @click="clearData"><span
+                        class="material-icons">delete</span>DATA </button></div>
+            <a href="https://note.com/jazzy_begin" target="_blank" class="copyright-footer">©2026 buro</a>
+            <!-- MANUAL MODAL -->
+            <div class="manual-modal" :class="{show: showManual}">
+                <div class="manual-content">
+                    <div class="manual-header">
+                        <h2>MANUAL</h2><button class="close-btn" @click="showManual = false"><span
+                                class="material-icons">close</span></button>
+                    </div>
+                    <div class="manual-body">
+                        <section>
+                            <h3><span class="material-icons">info</span>はじめに (INTRO)</h3>
+                            <p><strong>VOCALOID 50
+                                    SESSION</strong>へようこそ。<br>このアプリは、往年のボカロ名曲のコード進行に合わせて、<br>誰でも直感的に弾き語りセッションを楽しめるツールです。
+                            </p>
+                        </section>
+                        <section>
+                            <h3><span class="material-icons">touch_app</span>遊び方 (HOW TO PLAY)</h3>
+                            <ol>
+                                <li><strong>START</strong>ボタンでセッションを開始します。</li>
+                                <li>画面中央の大きな<strong>TAPパッド</strong>をタップしてください。</li>
+                                <li>タップするたびにコード(和音)が鳴ります。<br>
+                                    <span class="note">※
+                                        著作権の関係上、歌詞表示機能は廃止されました。代わりに「A1」「B2」「Sabi」などのセクション表示を頼りに演奏をお楽しみください。</span>
+                                </li>
+                            </ol>
+                        </section>
+                        <section>
+                            <h3><span class="material-icons">settings</span>機能紹介 (FEATURES)</h3>
+                            <ul>
+                                <li><strong>STYLE (演奏スタイル)</strong><br>設定パネル（左上のアイコン）から変更できます。 <ul>
+                                        <li><span class="hl">RHYTHM</span>: 初心者推奨。タップで自動のリズムパターンを刻みます。</li>
+                                        <li><span class="hl">STRUM</span>: ギターのストローク奏法。</li>
+                                        <li><span class="hl">ARP</span>: アルペジオ奏法。</li>
+                                    </ul>
+                                </li>
+                                <li><strong>KEY CHANGE (キー変更)</strong><br>自分の声域に合わせてキーを半音単位で調整可能です。</li>
+                                <li><strong>SONG LIST (選曲)</strong><br>左上のメニューまたは画面左端スワイプで曲リストを開きます。全50曲を収録。</li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h3><span class="material-icons">menu_book</span> メニュー説明 (MENU)</h3>
+                            <p>画面左上のアイコンから各機能にアクセスできます。</p>
+                            <ul style="list-style: none; padding-left: 10px;">
+                                <li style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    <span class="material-icons"
+                                        style="background: rgba(255,255,255,0.1); padding: 5px; border-radius: 4px;">menu</span>
+                                    <strong>曲リスト (SONG LIST)</strong><br>全50曲の中から演奏したい曲を選択します。
+                                </li>
+                                <li style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    <span class="material-icons"
+                                        style="background: rgba(255,255,255,0.1); padding: 5px; border-radius: 4px;">tune</span>
+                                    <strong>設定 (SETTINGS)</strong><br>演奏スタイルやキーの変更ができます。
+                                </li>
+                                <li style="display: flex; align-items: center; gap: 10px;">
+                                    <span class="material-icons"
+                                        style="background: rgba(255,255,255,0.1); padding: 5px; border-radius: 4px;">home</span>
+                                    <strong>タイトルへ (HOME)</strong><br>タイトル画面に戻ります。
+                                </li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h3><span class="material-icons">smartphone</span>推奨環境</h3>
+                            <p>Google Chrome / Safari (最新版)<br>マナーモードを解除し、十分な音量でお楽しみください。</p>
+                        </section>
+                        <div style="margin-top: 30px; text-align: center; opacity: 0.5; font-size: 0.8rem;">
+                            Developed by Manual's Genius Team
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="screen game-screen full-screen" :class="{active: curScreen === 'GAME'}">
+            <div class="top-bar">
+                <div class="top-left"><button class="nav-btn" @click="toggleSidebar"><span
+                            class="material-icons">menu</span></button><button class="nav-btn"
+                        @click="showConfig = !showConfig"><span class="material-icons">tune</span></button><button
+                        class="nav-btn" @click="toTitle"><span class="material-icons">home</span></button></div>
+                <div class="top-right score-box">
+                    <div>
+                        <!-- Combo Removed -->
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar" :class="{show: showSidebar}">
+                <div class="sb-header">
+                    <h3 style="margin:0; font-family:'Orbitron'">SONG LIST</h3><span class="material-icons"
+                        @click="showSidebar=false" style="cursor:pointer">close</span>
+                </div>
+                <div class="sb-list">
+                    <div v-for="(song, i) in songs" :key="song.id" class="sb-item" :class="{active: curSongIdx === i}"
+                        @click="selectSong(i)">
+                        <div style="font-weight:bold">{{ i + 1 }}. {{ song.title }}</div>
+                        <div style="font-size:0.75rem; color:#666">{{ song.artist }}</div>
+                        <div class="sb-score" v-if="getPlayCount(song.id)">{{ getPlayCount(song.id) }} PLAYS</div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-panel" :class="{show: showConfig}">
+                <div class="st-group">
+                    <div class="st-label">KEY CHANGE</div>
+                    <div class="st-row">
+                        <div class="st-opt" @click="transpose--">-</div>
+                        <div class="st-opt" style="flex:2; cursor:default; font-weight:bold; color:#fff">
+                            {{ transpose > 0 ? '+' + transpose : transpose }}
+                        </div>
+                        <div class="st-opt" @click="transpose++">+</div>
+                    </div>
+                </div>
+                <div class="st-group">
+                    <div class="st-label">STYLE</div>
+                    <div class="st-row">
+                        <div class="st-opt" :class="{active: opt.style==='STRUM'}" @click="opt.style='STRUM'">STRUM
+                        </div>
+                        <div class="st-opt" :class="{active: opt.style==='ARP'}" @click="opt.style='ARP'">ARP</div>
+                        <div class="st-opt" :class="{active: opt.style==='RHYTHM'}" @click="opt.style='RHYTHM'">RHYTHM
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="stage-wrapper" @click="handleStageClick">
+                <div class="stage-content">
+                    <div class="section-tag">{{ curSeg.section || 'INTRO' }}</div>
+                    <div class="chord" :class="{pulse: isPressed}">{{ displayChord }}</div>
+                    <div class="lyric-box">
+                        <div class="lyric">{{ curSeg.lyric || '♪' }}</div>
+                    </div>
+                    <div class="style-switcher" @click.stop>
+                        <button class="style-btn" :class="{active: opt.style==='RHYTHM'}"
+                            @click="opt.style='RHYTHM'">RHYTHM</button>
+                        <button class="style-btn" :class="{active: opt.style==='STRUM'}"
+                            @click="opt.style='STRUM'">STRUM</button>
+                        <button class="style-btn" :class="{active: opt.style==='ARP'}"
+                            @click="opt.style='ARP'">ARP</button>
+                    </div>
+                    <button class="tap-btn" :class="{pressed: isPressed}" @mousedown="handleHit"
+                        @touchstart.prevent="handleHit" @mouseup="isPressed=false"
+                        @touchend="isPressed=false">TAP<span>to Play</span></button>
+                </div>
+                <!-- Judgment Removed -->
+            </div>
+        </div>
+        <div class="result-overlay" v-if="isResult">
+            <div class="res-title">FINISH !</div><button class="res-btn" @click="closeResult">CONTINUE</button>
+        </div>
+    </div>
+    <script>const {
+            createApp,
+            ref,
+            computed,
+            onMounted
+        }
+
+            = Vue;
+
+        createApp({
+            setup() {
+                // App State
+                const curScreen = ref('LOADING');
+                const isResult = ref(false);
+
+                // ▼▼▼ 修正済みのデータ処理ロジック ▼▼▼
+                const rawSongs = window.ALL_SONGS_DATA || [];
+
+                // 自動で「歌詞削除」と「タイトル修正」を行う
+                const safeSongs = rawSongs.map(song => {
+                    return {
+
+                        ...song,
+                        // タイトルに「(風)」がなければ付ける
+                        title: song.title.includes('（風）') ? song.title : song.title + '（風）',
+                        segments: song.segments.map(seg => ({
+                            ...seg,
+                            lyric: '', // 歌詞を空っぽにする（著作権対策）
+                            chord: seg.chord
+                        }))
+                    }
+
+                        ;
+                });
+                const songs = ref(safeSongs);
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+                const savedScores = ref({});
+
+                // Game State
+                const curSongIdx = ref(0);
+                const segIndex = ref(0);
+                const combo = ref(0);
+                const isPlaying = ref(false);
+                const isPressed = ref(false);
+
+                const judge = ref({
+                    res: '', show: false
+                });
+                let judgeTimer = null;
+
+                // Audio Settings
+                const transpose = ref(0);
+                const showSidebar = ref(false);
+                const showConfig = ref(false);
+                const showManual = ref(false); // New State
+
+                const opt = ref({
+                    style: 'RHYTHM'
+                }); // Default to RHYTHM
+
+                // Audio
+                let sampler;
+
+                // Computed
+                const curSong = computed(() => songs.value[curSongIdx.value] || {});
+                const curSegments = computed(() => curSong.value.segments || []);
+
+                const curSeg = computed(() => (curSegments.value && curSegments.value[segIndex.value]) || {
+                    chord: '-', lyric: '♪'
+                });
+
+                // HELPERS
+                const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+                const transposeChordName = (chord, semi) => {
+                    const match = chord.match(/^([A-G][#b]?)(.*)$/);
+                    if (!match) return chord;
+                    let root = match[1];
+                    const quality = match[2];
+
+                    const rootToIdx = {
+                        'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4,
+                        'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8,
+                        'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+                    }
+
+                        ;
+                    let rootIdx = rootToIdx[root];
+                    if (rootIdx === undefined) return chord;
+                    let newIdx = (rootIdx + semi) % 12;
+                    if (newIdx < 0) newIdx += 12;
+                    return NOTE_NAMES[newIdx] + quality;
+                }
+
+                    ;
+
+                const displayChord = computed(() => {
+                    const c = curSeg.value.chord;
+                    if (!c || c === '-' || c === 'N.C.') return c;
+                    if (transpose.value === 0) return c;
+                    return transposeChordName(c, transpose.value);
+                });
+
+                // STORAGE
+                const loadData = () => {
+                    try {
+                        savedScores.value = JSON.parse(localStorage.getItem('voca50_counts')) || {}
+
+                            ;
+                    }
+
+                    catch (e) { }
+                }
+
+                    ;
+
+                const incPlayCount = (id) => {
+                    if (!savedScores.value[id]) savedScores.value[id] = 0;
+                    savedScores.value[id]++;
+                    localStorage.setItem('voca50_counts', JSON.stringify(savedScores.value));
+                }
+
+                    ;
+
+                const clearData = () => {
+                    if (confirm('Clear all data?')) {
+                        localStorage.removeItem('voca50_counts'); savedScores.value = {}
+
+                            ;
+                    }
+                }
+
+                    ;
+                const getPlayCount = (id) => savedScores.value[id] || 0;
+
+                // Navigation
+                const enterGame = async () => {
+                    await Tone.start(); curScreen.value = 'GAME';
+                }
+
+                    ;
+
+                const toTitle = () => {
+                    resetGame(); curScreen.value = 'TITLE';
+                }
+
+                    ;
+
+                const selectSong = (i) => {
+                    curSongIdx.value = i;
+                    showSidebar.value = false;
+                    resetGame();
+                    if (songs.value[i]) incPlayCount(songs.value[i].id);
+                }
+
+                    ;
+
+                const resetGame = () => {
+                    segIndex.value = 0; combo.value = 0; isPlaying.value = false; isResult.value = false; Tone.Transport.cancel(); Tone.Transport.stop();
+                }
+
+                    ;
+
+                const closeResult = () => {
+                    isResult.value = false; resetGame(); showSidebar.value = true;
+                }
+
+                    ;
+
+                const toggleSidebar = () => {
+                    showSidebar.value = !showSidebar.value; showConfig.value = false;
+                }
+
+                    ;
+
+                const handleStageClick = (e) => {
+                    if (!e.target.closest('.settings-panel') && !e.target.closest('.nav-btn')) showConfig.value = false;
+                }
+
+                    ;
+
+                // AUDIO LOGIC
+                const getChordNotes = (chordName) => {
+                    if (!chordName || chordName === '-' || chordName === 'N.C.') return [];
+                    const match = chordName.match(/^([A-G][#b]?)(.*)$/);
+                    if (!match) return [];
+                    const rootStr = match[1];
+                    const quality = match[2].trim();
+                    let intervals = [0, 7, 12, 16];
+                    if (quality.includes('m') && !quality.includes('maj')) intervals = [0, 7, 12, 15];
+                    if (quality.includes('dim')) intervals = [0, 6, 9, 15];
+
+                    const roots = {
+                        'C': 'C3', 'D': 'D3', 'E': 'E3', 'F': 'F2', 'G': 'G2', 'A': 'A2', 'B': 'B2'
+                    }
+
+                        ;
+                    let r = roots[rootStr.charAt(0)] || 'C3';
+                    let acc = 0;
+                    if (rootStr.includes('#')) acc = 1;
+                    if (rootStr.includes('b')) acc = -1;
+                    const base = Tone.Frequency(r).transpose(acc + transpose.value);
+                    return intervals.map(i => base.transpose(i).toNote());
+                }
+
+                    ;
+
+                const playStrum = (notes, time, duration = 0.05, direction = 'down', velocity = 1) => {
+                    const sorted = direction === 'down' ? notes : [...notes].reverse();
+                    const velBase = 0.6 * velocity;
+
+                    sorted.forEach((n, i) => {
+                        const delay = i * (duration / notes.length);
+                        const v = Math.min(1, velBase + Math.random() * 0.2);
+                        if (sampler && sampler.loaded) sampler.triggerAttackRelease(n, "2n", time + delay, v);
+                    });
+                }
+
+                    ;
+
+                const playPattern = (notes, now, bpm) => {
+                    const beat = 60 / bpm;
+                    playStrum(notes, now, 0.05, 'down', 1.0);
+                    playStrum(notes, now + beat, 0.06, 'down', 0.8);
+                    playStrum(notes, now + beat * 1.5, 0.05, 'up', 0.6);
+                    playStrum(notes, now + beat * 2.5, 0.05, 'up', 0.7);
+                    playStrum(notes, now + beat * 3, 0.06, 'down', 0.8);
+                    playStrum(notes, now + beat * 3.5, 0.05, 'up', 0.6);
+                };
+
+                const playArpeggio = (notes, now) => {
+                    // アルペジオパターン: 上昇 -> 下降
+                    if (notes.length < 2) {
+                        playStrum(notes, now, 0.1, 'down', 0.8);
+                        return;
+                    }
+
+                    // パターン生成: 上昇して戻ってくる (例: 0,1,2,3, 2,1)
+                    const pattern = [...notes];
+                    for (let i = notes.length - 2; i > 0; i--) {
+                        pattern.push(notes[i]);
+                    }
+
+                    pattern.forEach((n, i) => {
+                        // 1音ずつはっきり鳴らす (0.12秒間隔)
+                        const time = now + i * 0.12;
+                        // アクセント: 拍の頭(0)と頂点付近を強めに
+                        let vel = 0.6;
+                        if (i === 0) vel = 0.9;
+                        if (i === notes.length - 1) vel = 0.8;
+
+                        // 音色は少し短めに切って粒立ちを良くする
+                        if (sampler && sampler.loaded) sampler.triggerAttackRelease(n, "4n", time, vel);
+                    });
+                };
+
+                const handleHit = async () => {
+                    if (curScreen.value !== 'GAME' || isResult.value) return;
+                    isPressed.value = true;
+                    if (Tone.context.state !== 'running') await Tone.start();
+
+                    if (!isPlaying.value) {
+                        isPlaying.value = true;
+                        Tone.Transport.bpm.value = curSong.value.bpm || 120;
+                        Tone.Transport.start();
+                    }
+
+                    const notes = getChordNotes(curSeg.value.chord);
+
+                    if (notes.length > 0) {
+                        const now = Tone.now();
+                        const bpm = curSong.value.bpm || 120;
+                        if (opt.value.style === 'RHYTHM') playPattern(notes, now, bpm);
+                        else if (opt.value.style === 'STRUM') playStrum(notes, now, 0.06, 'down', 1.0);
+                        else playArpeggio(notes, now); // Use new Arpeggio function
+                    }
+
+                    // Combo increment removed
+                    if (curSegments.value && segIndex.value < curSegments.value.length - 1) segIndex.value++;
+                    else setTimeout(() => isResult.value = true, 500);
+
+                    // Judgment logic removed
+                }
+
+                    ;
+
+                // ▼ 開発者用機能：これを実行すると合法化されたデータをコンソールに出力します ▼
+                const exportCleanData = () => {
+                    console.log("▼以下のデータをコピーして all_songs.js に貼り付ければ、完全に合法化できます▼");
+                    const cleanString = "window.ALL_SONGS_DATA = " + JSON.stringify(safeSongs, null, 2) + ";";
+                    console.log(cleanString);
+                    alert('コンソール(F12)を開いてデータをコピーしてください');
+                }
+
+                    ;
+
+                onMounted(async () => {
+                    loadData();
+                    // exportCleanData(); // ← データファイルを書き換えたい時はここを外す
+
+                    let audioLoaded = false;
+
+                    const checkReady = () => {
+                        if (audioLoaded && songs.value.length > 0) {
+                            setTimeout(() => curScreen.value = 'TITLE', 800);
+                        }
+                    }
+
+                        ;
+                    const baseUrl = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_guitar_nylon-mp3/";
+
+                    sampler = new Tone.Sampler({
+                        urls: {
+                            "C3": "C3.mp3", "E3": "E3.mp3", "G3": "G3.mp3", "A3": "A3.mp3"
+                        }
+
+                        ,
+                        baseUrl: baseUrl,
+                        onload: () => {
+                            audioLoaded = true; checkReady();
+                        }
+                    }).toDestination();
+
+                    if (sampler.loaded) {
+                        audioLoaded = true; checkReady();
+                    }
+                });
+
+                return {
+                    curScreen, isResult, enterGame, toTitle, clearData,
+                    songs, curSongIdx, selectSong, getPlayCount,
+                    curSeg, combo, judge, isPressed, handleHit,
+                    showSidebar, showConfig, showManual, toggleSidebar, handleStageClick,
+                    opt, closeResult, transpose, displayChord, exportCleanData
+                }
+
+                    ;
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>
